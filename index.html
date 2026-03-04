@@ -1,0 +1,911 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SubTracker — Find & Cancel Hidden Subscriptions</title>
+<style>
+:root {
+  --bg: #0a0a0f;
+  --card: #12121a;
+  --card2: #1a1a25;
+  --border: #2a2a3a;
+  --text: #e8e8f0;
+  --text2: #8888a0;
+  --accent: #6c5ce7;
+  --accent2: #a29bfe;
+  --green: #00b894;
+  --red: #ff6b6b;
+  --orange: #fdcb6e;
+  --yellow: #ffeaa7;
+  --radius: 12px;
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+
+/* Header */
+.header { padding: 30px 40px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
+.logo { display: flex; align-items: center; gap: 12px; }
+.logo-icon { font-size: 32px; }
+.logo h1 { font-size: 24px; font-weight: 700; }
+.logo h1 span { color: var(--accent2); }
+.logo-sub { color: var(--text2); font-size: 13px; margin-top: 2px; }
+.header-right { display: flex; align-items: center; gap: 15px; }
+.privacy-badge { background: rgba(0,184,148,0.1); color: var(--green); padding: 6px 14px; border-radius: 20px; font-size: 12px; font-weight: 600; }
+
+/* Main Layout */
+.main { max-width: 1200px; margin: 0 auto; padding: 30px 40px; }
+
+/* Upload Zone */
+.upload-section { margin-bottom: 30px; }
+.upload-zone { border: 2px dashed var(--border); border-radius: var(--radius); padding: 50px; text-align: center; cursor: pointer; transition: all 0.3s; background: var(--card); position: relative; }
+.upload-zone:hover, .upload-zone.dragover { border-color: var(--accent); background: rgba(108,92,231,0.05); }
+.upload-zone .icon { font-size: 48px; margin-bottom: 15px; }
+.upload-zone h3 { font-size: 20px; margin-bottom: 8px; }
+.upload-zone p { color: var(--text2); font-size: 14px; }
+.upload-zone .formats { margin-top: 12px; display: flex; gap: 8px; justify-content: center; }
+.upload-zone .format-tag { background: var(--card2); padding: 4px 12px; border-radius: 6px; font-size: 12px; color: var(--text2); }
+.upload-zone input[type="file"] { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+
+/* Manual Entry */
+.manual-section { margin-top: 15px; text-align: center; }
+.manual-toggle { background: none; border: 1px solid var(--border); color: var(--text2); padding: 8px 20px; border-radius: 8px; cursor: pointer; font-size: 13px; transition: all 0.2s; }
+.manual-toggle:hover { border-color: var(--accent); color: var(--text); }
+.manual-area { display: none; margin-top: 15px; }
+.manual-area.show { display: block; }
+.manual-area textarea { width: 100%; height: 200px; background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 15px; color: var(--text); font-family: 'Courier New', monospace; font-size: 13px; resize: vertical; }
+.manual-area textarea:focus { outline: none; border-color: var(--accent); }
+.manual-area .hint { color: var(--text2); font-size: 12px; margin-top: 8px; }
+.manual-area .parse-btn { margin-top: 12px; background: var(--accent); color: #fff; border: none; padding: 10px 24px; border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: 600; }
+.manual-area .parse-btn:hover { background: var(--accent2); }
+
+/* Demo button */
+.demo-btn { background: rgba(108,92,231,0.15); color: var(--accent2); border: 1px solid rgba(108,92,231,0.3); padding: 8px 20px; border-radius: 8px; cursor: pointer; font-size: 13px; margin-left: 10px; transition: all 0.2s; }
+.demo-btn:hover { background: rgba(108,92,231,0.25); }
+
+/* Dashboard */
+.dashboard { display: none; }
+.dashboard.show { display: block; }
+
+/* Stats Row */
+.stats-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; margin-bottom: 25px; }
+.stat-card { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; }
+.stat-card .label { font-size: 12px; color: var(--text2); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; }
+.stat-card .value { font-size: 28px; font-weight: 700; }
+.stat-card .sub { font-size: 12px; color: var(--text2); margin-top: 4px; }
+.stat-card.danger .value { color: var(--red); }
+.stat-card.savings .value { color: var(--green); }
+.stat-card.warning .value { color: var(--orange); }
+.stat-card.info .value { color: var(--accent2); }
+
+/* Tabs */
+.tabs { display: flex; gap: 5px; margin-bottom: 20px; background: var(--card); padding: 4px; border-radius: 10px; width: fit-content; }
+.tab { padding: 8px 20px; border-radius: 8px; border: none; background: transparent; color: var(--text2); cursor: pointer; font-size: 13px; font-weight: 500; transition: all 0.2s; }
+.tab.active { background: var(--accent); color: #fff; }
+.tab:hover:not(.active) { color: var(--text); }
+
+/* Subscription List */
+.sub-list { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+.sub-header { display: grid; grid-template-columns: 2fr 1fr 1fr 1fr 1fr 100px; padding: 12px 20px; background: var(--card2); font-size: 12px; color: var(--text2); text-transform: uppercase; letter-spacing: 1px; border-bottom: 1px solid var(--border); }
+.sub-row { display: grid; grid-template-columns: 2fr 1fr 1fr 1fr 1fr 100px; padding: 14px 20px; border-bottom: 1px solid var(--border); align-items: center; transition: background 0.2s; }
+.sub-row:last-child { border-bottom: none; }
+.sub-row:hover { background: rgba(108,92,231,0.03); }
+.sub-name { display: flex; align-items: center; gap: 10px; }
+.sub-name .emoji { font-size: 20px; width: 36px; height: 36px; background: var(--card2); border-radius: 8px; display: flex; align-items: center; justify-content: center; }
+.sub-name .details .title { font-weight: 600; font-size: 14px; }
+.sub-name .details .desc { font-size: 12px; color: var(--text2); }
+.sub-amount { font-weight: 600; }
+.sub-annual { color: var(--text2); font-size: 13px; }
+.sub-freq { font-size: 13px; }
+.sub-category { font-size: 12px; }
+.sub-category .cat-tag { background: var(--card2); padding: 3px 10px; border-radius: 6px; }
+.sub-action { text-align: right; }
+.sub-action a { color: var(--red); text-decoration: none; font-size: 12px; font-weight: 600; padding: 4px 12px; border: 1px solid var(--red); border-radius: 6px; transition: all 0.2s; }
+.sub-action a:hover { background: var(--red); color: #fff; }
+
+/* Category Breakdown */
+.category-section { display: none; }
+.category-section.show { display: block; }
+.cat-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; }
+.cat-card { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; }
+.cat-card .cat-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+.cat-card .cat-name { font-size: 16px; font-weight: 600; }
+.cat-card .cat-total { font-size: 18px; font-weight: 700; color: var(--accent2); }
+.cat-card .cat-bar { height: 6px; background: var(--card2); border-radius: 3px; overflow: hidden; margin-bottom: 10px; }
+.cat-card .cat-bar .fill { height: 100%; background: var(--accent); border-radius: 3px; }
+.cat-card .cat-items { font-size: 13px; color: var(--text2); }
+
+/* Mystery Charges */
+.mystery-section { display: none; }
+.mystery-section.show { display: block; }
+.mystery-card { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; }
+.mystery-card .charge-name { font-weight: 600; font-size: 15px; }
+.mystery-card .charge-decoded { color: var(--green); font-size: 13px; margin-top: 4px; }
+.mystery-card .charge-amount { font-weight: 700; font-size: 16px; }
+
+/* Charts */
+.chart-container { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 25px; margin-bottom: 20px; }
+.chart-container h3 { font-size: 16px; margin-bottom: 15px; }
+.bar-chart { display: flex; flex-direction: column; gap: 8px; }
+.bar-row { display: flex; align-items: center; gap: 12px; }
+.bar-label { width: 120px; font-size: 13px; color: var(--text2); text-align: right; }
+.bar-track { flex: 1; height: 24px; background: var(--card2); border-radius: 4px; overflow: hidden; position: relative; }
+.bar-fill { height: 100%; border-radius: 4px; display: flex; align-items: center; padding-left: 8px; font-size: 11px; font-weight: 600; color: #fff; min-width: 40px; transition: width 0.5s; }
+.bar-value { width: 80px; font-size: 13px; font-weight: 600; text-align: right; }
+
+/* Export */
+.export-bar { display: flex; gap: 10px; margin-top: 20px; justify-content: flex-end; }
+.export-btn { background: var(--card); border: 1px solid var(--border); color: var(--text); padding: 8px 18px; border-radius: 8px; cursor: pointer; font-size: 13px; transition: all 0.2s; }
+.export-btn:hover { border-color: var(--accent); }
+
+/* Reset */
+.reset-btn { position: fixed; bottom: 20px; right: 20px; background: var(--card); border: 1px solid var(--border); color: var(--text2); padding: 10px 20px; border-radius: 8px; cursor: pointer; font-size: 13px; }
+.reset-btn:hover { border-color: var(--red); color: var(--red); }
+
+/* Responsive */
+@media (max-width: 768px) {
+  .stats-row { grid-template-columns: repeat(2, 1fr); }
+  .cat-grid { grid-template-columns: 1fr; }
+  .sub-header, .sub-row { grid-template-columns: 2fr 1fr 1fr; }
+  .sub-annual, .sub-category, .sub-freq { display: none; }
+  .header { padding: 20px; }
+  .main { padding: 20px; }
+}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="logo">
+    <div class="logo-icon">💸</div>
+    <div>
+      <h1>Sub<span>Tracker</span></h1>
+      <div class="logo-sub">Find & cancel hidden subscriptions</div>
+    </div>
+  </div>
+  <div class="header-right">
+    <div class="privacy-badge">🔒 100% Local — No Data Leaves Your Machine</div>
+  </div>
+</div>
+
+<div class="main">
+  <!-- Upload Section -->
+  <div class="upload-section" id="uploadSection">
+    <div class="upload-zone" id="uploadZone">
+      <input type="file" id="fileInput" accept=".csv,.pdf,.txt,.ofx,.qfx,.qbo" multiple>
+      <div class="icon">📂</div>
+      <h3>Drop your bank statements here</h3>
+      <p>Upload 2-3 months of statements to find all recurring charges</p>
+      <div class="formats">
+        <span class="format-tag">CSV</span>
+        <span class="format-tag">PDF</span>
+        <span class="format-tag">TXT</span>
+        <span class="format-tag">OFX/QFX</span>
+      </div>
+    </div>
+    <div class="manual-section">
+      <button class="manual-toggle" onclick="toggleManual()">✏️ Paste statement text instead</button>
+      <button class="demo-btn" onclick="loadDemo()">🎮 Try with demo data</button>
+      <div class="manual-area" id="manualArea">
+        <textarea id="manualText" placeholder="Paste your bank statement text or CSV data here...&#10;&#10;Example CSV format:&#10;Date,Description,Amount&#10;03/01/2026,NETFLIX.COM,-15.99&#10;03/01/2026,SPOTIFY USA,-11.99&#10;03/02/2026,AMAZON PRIME,-14.99"></textarea>
+        <div class="hint">Supports most CSV formats — we'll auto-detect columns. You can also paste raw text from a bank statement PDF.</div>
+        <button class="parse-btn" onclick="parseManualInput()">🔍 Scan for Subscriptions</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Dashboard -->
+  <div class="dashboard" id="dashboard">
+    <div class="stats-row" id="statsRow"></div>
+    
+    <div class="tabs">
+      <button class="tab active" onclick="switchTab('subs')">📋 All Subscriptions</button>
+      <button class="tab" onclick="switchTab('categories')">📊 Categories</button>
+      <button class="tab" onclick="switchTab('mystery')">🔍 Mystery Charges</button>
+    </div>
+
+    <!-- Subscriptions Tab -->
+    <div id="subsTab">
+      <div class="chart-container" id="monthlyChart"></div>
+      <div class="sub-list" id="subList"></div>
+    </div>
+
+    <!-- Categories Tab -->
+    <div class="category-section" id="categoriesTab">
+      <div class="cat-grid" id="catGrid"></div>
+    </div>
+
+    <!-- Mystery Charges Tab -->
+    <div class="mystery-section" id="mysteryTab">
+      <div id="mysteryList"></div>
+    </div>
+
+    <div class="export-bar">
+      <button class="export-btn" onclick="exportCSV()">📥 Export CSV</button>
+      <button class="export-btn" onclick="exportJSON()">📥 Export JSON</button>
+      <button class="export-btn" onclick="window.print()">🖨️ Print Report</button>
+    </div>
+  </div>
+</div>
+
+<button class="reset-btn" id="resetBtn" style="display:none" onclick="resetApp()">↩️ Scan New Statement</button>
+
+
+<script>
+// ============================================================
+// MERCHANT DATABASE — maps cryptic bank descriptions to real names
+// ============================================================
+var MERCHANTS = {
+  'NETFLIX': { name: 'Netflix', emoji: '🎬', category: 'Streaming', cancelUrl: 'https://help.netflix.com/en/node/407' },
+  'SPOTIFY': { name: 'Spotify', emoji: '🎵', category: 'Music', cancelUrl: 'https://support.spotify.com/us/article/how-to-cancel/' },
+  'AMAZON PRIME': { name: 'Amazon Prime', emoji: '📦', category: 'Shopping', cancelUrl: 'https://www.amazon.com/gp/help/customer/display.html?nodeId=201118010' },
+  'AMZN MKTP': { name: 'Amazon Purchase', emoji: '🛒', category: 'Shopping', cancelUrl: 'https://www.amazon.com/gp/css/order-history' },
+  'AMZN DIGITAL': { name: 'Amazon Digital', emoji: '📱', category: 'Digital Services', cancelUrl: 'https://www.amazon.com/gp/help/customer/display.html?nodeId=201118010' },
+  'APPLE.COM': { name: 'Apple Services', emoji: '🍎', category: 'Tech', cancelUrl: 'https://support.apple.com/en-us/HT202039' },
+  'APPLE MUSIC': { name: 'Apple Music', emoji: '🎵', category: 'Music', cancelUrl: 'https://support.apple.com/en-us/HT202039' },
+  'HULU': { name: 'Hulu', emoji: '📺', category: 'Streaming', cancelUrl: 'https://help.hulu.com/s/article/cancel-subscription' },
+  'DISNEY PLUS': { name: 'Disney+', emoji: '🏰', category: 'Streaming', cancelUrl: 'https://help.disneyplus.com/csp?id=csp_article&article=assisted-cancel' },
+  'DISNEYPLUS': { name: 'Disney+', emoji: '🏰', category: 'Streaming', cancelUrl: 'https://help.disneyplus.com/csp?id=csp_article&article=assisted-cancel' },
+  'HBO MAX': { name: 'Max (HBO)', emoji: '📺', category: 'Streaming', cancelUrl: 'https://help.max.com/us/Answer/Detail/000001163' },
+  'YOUTUBE': { name: 'YouTube Premium', emoji: '▶️', category: 'Streaming', cancelUrl: 'https://support.google.com/youtube/answer/6308278' },
+  'GOOGLE': { name: 'Google Services', emoji: '🔍', category: 'Tech', cancelUrl: 'https://support.google.com/googleplay/answer/7018481' },
+  'GOOGLE STOR': { name: 'Google One Storage', emoji: '☁️', category: 'Cloud Storage', cancelUrl: 'https://one.google.com/settings' },
+  'GOOGLE ONE': { name: 'Google One', emoji: '☁️', category: 'Cloud Storage', cancelUrl: 'https://one.google.com/settings' },
+  'MICROSOFT': { name: 'Microsoft 365', emoji: '💼', category: 'Productivity', cancelUrl: 'https://account.microsoft.com/services' },
+  'MSFT': { name: 'Microsoft', emoji: '💼', category: 'Productivity', cancelUrl: 'https://account.microsoft.com/services' },
+  'ADOBE': { name: 'Adobe Creative Cloud', emoji: '🎨', category: 'Creative', cancelUrl: 'https://helpx.adobe.com/manage-account/using/cancel-subscription.html' },
+  'DROPBOX': { name: 'Dropbox', emoji: '📁', category: 'Cloud Storage', cancelUrl: 'https://help.dropbox.com/account-access/cancel-account' },
+  'ICLOUD': { name: 'iCloud+', emoji: '☁️', category: 'Cloud Storage', cancelUrl: 'https://support.apple.com/en-us/HT202039' },
+  'PARAMOUNT': { name: 'Paramount+', emoji: '⭐', category: 'Streaming', cancelUrl: 'https://help.paramountplus.com/s/article/How-do-I-cancel' },
+  'PEACOCK': { name: 'Peacock', emoji: '🦚', category: 'Streaming', cancelUrl: 'https://www.peacocktv.com/help/article/how-do-i-cancel-my-peacock-account' },
+  'CRUNCHYROLL': { name: 'Crunchyroll', emoji: '🍥', category: 'Streaming', cancelUrl: 'https://help.crunchyroll.com/hc/en-us/articles/360035707372' },
+  'NORDVPN': { name: 'NordVPN', emoji: '🔐', category: 'Security', cancelUrl: 'https://support.nordvpn.com/General-info/1047408532/How-can-I-cancel-my-subscription.htm' },
+  'EXPRESSVPN': { name: 'ExpressVPN', emoji: '🔐', category: 'Security', cancelUrl: 'https://www.expressvpn.com/support/troubleshooting/cancel-subscription/' },
+  'CHATGPT': { name: 'ChatGPT Plus', emoji: '🤖', category: 'AI Tools', cancelUrl: 'https://help.openai.com/en/articles/7232683' },
+  'OPENAI': { name: 'OpenAI', emoji: '🤖', category: 'AI Tools', cancelUrl: 'https://help.openai.com/en/articles/7232683' },
+  'CLAUDE': { name: 'Claude Pro', emoji: '🧠', category: 'AI Tools', cancelUrl: 'https://support.anthropic.com' },
+  'ANTHROPIC': { name: 'Anthropic (Claude)', emoji: '🧠', category: 'AI Tools', cancelUrl: 'https://support.anthropic.com' },
+  'MIDJOURNEY': { name: 'Midjourney', emoji: '🎨', category: 'AI Tools', cancelUrl: 'https://docs.midjourney.com/docs/plans' },
+  'GYM': { name: 'Gym Membership', emoji: '🏋️', category: 'Fitness', cancelUrl: '' },
+  'PLANET FIT': { name: 'Planet Fitness', emoji: '🏋️', category: 'Fitness', cancelUrl: 'https://www.planetfitness.com/about-planet-fitness/customer-service' },
+  'EQUINOX': { name: 'Equinox', emoji: '🏋️', category: 'Fitness', cancelUrl: '' },
+  'PELOTON': { name: 'Peloton', emoji: '🚲', category: 'Fitness', cancelUrl: 'https://support.onepeloton.com/hc/en-us/articles/203291445' },
+  'LINKEDIN': { name: 'LinkedIn Premium', emoji: '💼', category: 'Professional', cancelUrl: 'https://www.linkedin.com/help/linkedin/answer/50' },
+  'SLACK': { name: 'Slack', emoji: '💬', category: 'Productivity', cancelUrl: 'https://slack.com/help/articles/218915077' },
+  'ZOOM': { name: 'Zoom', emoji: '📹', category: 'Productivity', cancelUrl: 'https://support.zoom.us/hc/en-us/articles/115005269946' },
+  'NOTION': { name: 'Notion', emoji: '📝', category: 'Productivity', cancelUrl: 'https://www.notion.so/help/billing-and-plans' },
+  'CANVA': { name: 'Canva Pro', emoji: '🎨', category: 'Creative', cancelUrl: 'https://www.canva.com/help/article/cancel-plan' },
+  'GRAMMARLY': { name: 'Grammarly', emoji: '✍️', category: 'Productivity', cancelUrl: 'https://support.grammarly.com/hc/en-us/articles/115000090172' },
+  'DUOLINGO': { name: 'Duolingo Plus', emoji: '🦉', category: 'Education', cancelUrl: 'https://support.duolingo.com/hc/en-us/articles/360029239811' },
+  'HEADSPACE': { name: 'Headspace', emoji: '🧘', category: 'Wellness', cancelUrl: 'https://help.headspace.com/hc/en-us/articles/115005693786' },
+  'CALM': { name: 'Calm', emoji: '🧘', category: 'Wellness', cancelUrl: 'https://support.calm.com/hc/en-us/articles/360000712587' },
+  'DOORDASH': { name: 'DoorDash DashPass', emoji: '🚗', category: 'Food Delivery', cancelUrl: 'https://help.doordash.com/consumers/s/article/How-do-I-cancel-my-DashPass-membership' },
+  'UBER EATS': { name: 'Uber One / Uber Eats', emoji: '🍔', category: 'Food Delivery', cancelUrl: 'https://help.uber.com/riders/article/how-to-cancel-my-uber-one-membership' },
+  'UBER': { name: 'Uber One', emoji: '🚕', category: 'Transportation', cancelUrl: 'https://help.uber.com/riders/article/how-to-cancel-my-uber-one-membership' },
+  'INSTACART': { name: 'Instacart+', emoji: '🛒', category: 'Shopping', cancelUrl: 'https://www.instacart.com/help/section/360007797972' },
+  'WALMART': { name: 'Walmart+', emoji: '🏪', category: 'Shopping', cancelUrl: 'https://www.walmart.com/help/article/walmart-cancellation/6dcaf27c70084aa68c5de8e8cce0a3cb' },
+  'COSTCO': { name: 'Costco Membership', emoji: '🏪', category: 'Shopping', cancelUrl: '' },
+  'NYT': { name: 'NY Times', emoji: '📰', category: 'News', cancelUrl: 'https://help.nytimes.com/hc/en-us/articles/360003499613' },
+  'WSJ': { name: 'Wall Street Journal', emoji: '📰', category: 'News', cancelUrl: 'https://customercenter.wsj.com' },
+  'WASHINGTON POST': { name: 'Washington Post', emoji: '📰', category: 'News', cancelUrl: '' },
+  'TIDAL': { name: 'Tidal', emoji: '🎵', category: 'Music', cancelUrl: 'https://support.tidal.com/hc/en-us/articles/115000397069' },
+  'AUDIBLE': { name: 'Audible', emoji: '🎧', category: 'Entertainment', cancelUrl: 'https://help.audible.com/s/article/how-to-cancel-your-membership' },
+  'KINDLE': { name: 'Kindle Unlimited', emoji: '📚', category: 'Entertainment', cancelUrl: 'https://www.amazon.com/gp/help/customer/display.html?nodeId=201550620' },
+  'XBOX': { name: 'Xbox Game Pass', emoji: '🎮', category: 'Gaming', cancelUrl: 'https://support.xbox.com/en-US/help/subscriptions-billing/manage-subscriptions/cancel-subscription' },
+  'PLAYSTATION': { name: 'PlayStation Plus', emoji: '🎮', category: 'Gaming', cancelUrl: 'https://www.playstation.com/en-us/support/store/cancel-ps-store-subscription/' },
+  'NINTENDO': { name: 'Nintendo Online', emoji: '🎮', category: 'Gaming', cancelUrl: 'https://en-americas-support.nintendo.com/app/answers/detail/a_id/41199' },
+  'EA PLAY': { name: 'EA Play', emoji: '🎮', category: 'Gaming', cancelUrl: '' },
+  'GEICO': { name: 'GEICO Insurance', emoji: '🦎', category: 'Insurance', cancelUrl: '' },
+  'STATE FARM': { name: 'State Farm', emoji: '🏠', category: 'Insurance', cancelUrl: '' },
+  'ALLSTATE': { name: 'Allstate', emoji: '🏠', category: 'Insurance', cancelUrl: '' },
+  'PROGRESSIVE': { name: 'Progressive', emoji: '🚗', category: 'Insurance', cancelUrl: '' },
+  'T-MOBILE': { name: 'T-Mobile', emoji: '📱', category: 'Phone', cancelUrl: '' },
+  'VERIZON': { name: 'Verizon', emoji: '📱', category: 'Phone', cancelUrl: '' },
+  'AT&T': { name: 'AT&T', emoji: '📱', category: 'Phone', cancelUrl: '' },
+  'ATT': { name: 'AT&T', emoji: '📱', category: 'Phone', cancelUrl: '' },
+  'COMCAST': { name: 'Comcast / Xfinity', emoji: '📡', category: 'Internet', cancelUrl: 'https://www.xfinity.com/support/cancel' },
+  'XFINITY': { name: 'Xfinity', emoji: '📡', category: 'Internet', cancelUrl: 'https://www.xfinity.com/support/cancel' },
+  'SPECTRUM': { name: 'Spectrum', emoji: '📡', category: 'Internet', cancelUrl: '' },
+  'TWITCH': { name: 'Twitch Sub', emoji: '🎮', category: 'Streaming', cancelUrl: 'https://help.twitch.tv/s/article/how-to-cancel-a-subscription' },
+  'PATREON': { name: 'Patreon', emoji: '❤️', category: 'Creator Support', cancelUrl: 'https://support.patreon.com/hc/en-us/articles/360000126286' },
+  'GITHUB': { name: 'GitHub Pro', emoji: '💻', category: 'Developer', cancelUrl: 'https://docs.github.com/en/billing/managing-billing-for-your-github-account/downgrading-your-github-subscription' },
+  'FIGMA': { name: 'Figma', emoji: '🎨', category: 'Creative', cancelUrl: '' },
+  'VERCEL': { name: 'Vercel', emoji: '▲', category: 'Developer', cancelUrl: '' },
+  'DIGITALOCEAN': { name: 'DigitalOcean', emoji: '🌊', category: 'Developer', cancelUrl: '' },
+  'AWS': { name: 'Amazon Web Services', emoji: '☁️', category: 'Developer', cancelUrl: 'https://aws.amazon.com/premiumsupport/knowledge-center/close-aws-account/' },
+  'HEROKU': { name: 'Heroku', emoji: '🟣', category: 'Developer', cancelUrl: '' },
+  'HELPPAY': { name: 'Google Service', emoji: '🔍', category: 'Tech', cancelUrl: '' },
+  'STARBUCKS': { name: 'Starbucks', emoji: '☕', category: 'Food & Drink', cancelUrl: '' },
+  'SQ *': { name: 'Square Payment', emoji: '💳', category: 'Misc', cancelUrl: '' },
+  'PAYPAL': { name: 'PayPal Subscription', emoji: '💰', category: 'Payments', cancelUrl: 'https://www.paypal.com/myaccount/autopay/' },
+  'CURSOR': { name: 'Cursor IDE', emoji: '💻', category: 'Developer', cancelUrl: '' },
+  'COPILOT': { name: 'GitHub Copilot', emoji: '🤖', category: 'Developer', cancelUrl: '' },
+  'DASHLANE': { name: 'Dashlane', emoji: '🔐', category: 'Security', cancelUrl: '' },
+  '1PASSWORD': { name: '1Password', emoji: '🔐', category: 'Security', cancelUrl: '' },
+  'LASTPASS': { name: 'LastPass', emoji: '🔐', category: 'Security', cancelUrl: '' },
+  'BITWARDEN': { name: 'Bitwarden', emoji: '🔐', category: 'Security', cancelUrl: '' }
+};
+
+
+// ============================================================
+// CATEGORY COLORS
+// ============================================================
+var CAT_COLORS = {
+  'Streaming': '#e74c3c', 'Music': '#9b59b6', 'Shopping': '#f39c12', 'Tech': '#3498db',
+  'Cloud Storage': '#1abc9c', 'Productivity': '#2ecc71', 'Creative': '#e91e63', 'AI Tools': '#00bcd4',
+  'Fitness': '#ff5722', 'Gaming': '#8bc34a', 'Security': '#607d8b', 'Food Delivery': '#ff9800',
+  'Entertainment': '#673ab7', 'News': '#795548', 'Education': '#4caf50', 'Wellness': '#009688',
+  'Professional': '#2196f3', 'Insurance': '#546e7a', 'Phone': '#78909c', 'Internet': '#455a64',
+  'Developer': '#263238', 'Transportation': '#ffc107', 'Digital Services': '#ab47bc',
+  'Creator Support': '#ec407a', 'Payments': '#42a5f5', 'Food & Drink': '#ef6c00', 'Misc': '#90a4ae'
+};
+
+// ============================================================
+// CSV PARSER — handles many bank export formats
+// ============================================================
+function parseCSV(text) {
+  var lines = text.trim().split(/\r?\n/);
+  if (lines.length < 2) return [];
+  
+  // Auto-detect delimiter
+  var delim = ',';
+  if (lines[0].split('\t').length > lines[0].split(',').length) delim = '\t';
+  if (lines[0].split(';').length > lines[0].split(',').length) delim = ';';
+  
+  // Parse header
+  var header = parseCSVLine(lines[0], delim).map(function(h) { return h.toLowerCase().trim().replace(/["\']/g, ''); });
+  
+  // Find relevant columns
+  var dateCol = findCol(header, ['date', 'posted date', 'post date', 'transaction date', 'trans date', 'posting date', 'txn date']);
+  var descCol = findCol(header, ['description', 'desc', 'memo', 'merchant', 'name', 'payee', 'transaction', 'narrative', 'details', 'reference']);
+  var amountCol = findCol(header, ['amount', 'debit', 'withdrawal', 'charge', 'value', 'sum']);
+  
+  if (descCol === -1) {
+    // Try to find description in any column that has text
+    for (var i = 0; i < header.length; i++) {
+      if (header[i] && !header[i].match(/date|amount|balance|credit|debit|ref|num|check|type|status|category/i)) {
+        descCol = i; break;
+      }
+    }
+  }
+  
+  if (descCol === -1) return [];
+  
+  var transactions = [];
+  for (var i = 1; i < lines.length; i++) {
+    if (!lines[i].trim()) continue;
+    var cols = parseCSVLine(lines[i], delim);
+    if (cols.length <= descCol) continue;
+    
+    var desc = (cols[descCol] || '').replace(/["\']/g, '').trim();
+    var amount = 0;
+    if (amountCol !== -1 && cols[amountCol]) {
+      amount = parseFloat(cols[amountCol].replace(/[^\d.\-]/g, '')) || 0;
+    }
+    var date = dateCol !== -1 ? (cols[dateCol] || '').replace(/["\']/g, '').trim() : '';
+    
+    if (desc) {
+      transactions.push({ date: date, description: desc, amount: Math.abs(amount) });
+    }
+  }
+  return transactions;
+}
+
+function parseCSVLine(line, delim) {
+  var result = [];
+  var current = '';
+  var inQuotes = false;
+  for (var i = 0; i < line.length; i++) {
+    var ch = line[i];
+    if (ch === '"') { inQuotes = !inQuotes; }
+    else if (ch === delim && !inQuotes) { result.push(current); current = ''; }
+    else { current += ch; }
+  }
+  result.push(current);
+  return result;
+}
+
+function findCol(header, names) {
+  for (var n = 0; n < names.length; n++) {
+    for (var i = 0; i < header.length; i++) {
+      if (header[i].includes(names[n])) return i;
+    }
+  }
+  return -1;
+}
+
+// ============================================================
+// TEXT PARSER — for pasted raw text from bank statements
+// ============================================================
+function parseRawText(text) {
+  var lines = text.trim().split(/\r?\n/);
+  var transactions = [];
+  
+  // Try CSV first
+  if (lines[0] && (lines[0].includes(',') || lines[0].includes('\t'))) {
+    var csvResult = parseCSV(text);
+    if (csvResult.length > 0) return csvResult;
+  }
+  
+  // Parse raw text lines
+  var dateRegex = /\b(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4})\b/;
+  var amountRegex = /[\$]?\s*(\d{1,6}[,.]\d{2})\b/g;
+  
+  for (var i = 0; i < lines.length; i++) {
+    var line = lines[i].trim();
+    if (!line || line.length < 5) continue;
+    
+    var dateMatch = line.match(dateRegex);
+    var amounts = [];
+    var m;
+    var amtRegex = /[\-]?[\$]?\s*(\d{1,6}[,.]\d{2})/g;
+    while ((m = amtRegex.exec(line)) !== null) {
+      amounts.push(parseFloat(m[1].replace(',', '')));
+    }
+    
+    var desc = line;
+    if (dateMatch) desc = desc.replace(dateMatch[0], '').trim();
+    amounts.forEach(function(a) { desc = desc.replace(a.toFixed(2), '').replace('$', '').trim(); });
+    desc = desc.replace(/^[\s\-\/]+|[\s\-\/]+$/g, '').trim();
+    
+    if (desc.length > 2 && amounts.length > 0) {
+      transactions.push({
+        date: dateMatch ? dateMatch[1] : '',
+        description: desc,
+        amount: amounts[amounts.length - 1]
+      });
+    }
+  }
+  return transactions;
+}
+
+// ============================================================
+// SUBSCRIPTION DETECTION ENGINE
+// ============================================================
+function identifyMerchant(desc) {
+  var upper = desc.toUpperCase();
+  var keys = Object.keys(MERCHANTS);
+  
+  // Sort by length descending so longer/more specific matches win
+  keys.sort(function(a, b) { return b.length - a.length; });
+  
+  for (var i = 0; i < keys.length; i++) {
+    if (upper.includes(keys[i])) return MERCHANTS[keys[i]];
+  }
+  return null;
+}
+
+function findSubscriptions(transactions) {
+  // Group by normalized description
+  var groups = {};
+  transactions.forEach(function(t) {
+    var key = normalizeDesc(t.description);
+    if (!groups[key]) groups[key] = [];
+    groups[key].push(t);
+  });
+  
+  var subscriptions = [];
+  var mysteries = [];
+  
+  Object.keys(groups).forEach(function(key) {
+    var txns = groups[key];
+    var merchant = identifyMerchant(key);
+    
+    // Check if it's recurring: same amount appears 2+ times, or known merchant
+    var amountCounts = {};
+    txns.forEach(function(t) {
+      var a = t.amount.toFixed(2);
+      amountCounts[a] = (amountCounts[a] || 0) + 1;
+    });
+    
+    var mostCommonAmount = 0;
+    var maxCount = 0;
+    Object.keys(amountCounts).forEach(function(a) {
+      if (amountCounts[a] > maxCount) { maxCount = amountCounts[a]; mostCommonAmount = parseFloat(a); }
+    });
+    
+    var isRecurring = maxCount >= 2 || merchant !== null;
+    var isMystery = !merchant && txns.length >= 1 && mostCommonAmount > 0;
+    
+    if (isRecurring && mostCommonAmount > 0) {
+      var freq = guessFrequency(txns, mostCommonAmount);
+      var annual = calcAnnual(mostCommonAmount, freq);
+      
+      subscriptions.push({
+        name: merchant ? merchant.name : cleanName(txns[0].description),
+        rawName: txns[0].description,
+        emoji: merchant ? merchant.emoji : '💳',
+        category: merchant ? merchant.category : guessCategory(txns[0].description),
+        amount: mostCommonAmount,
+        frequency: freq,
+        annual: annual,
+        cancelUrl: merchant ? merchant.cancelUrl : '',
+        occurrences: maxCount,
+        lastDate: txns[txns.length - 1].date
+      });
+    } else if (isMystery && !merchant) {
+      var decoded = tryDecode(txns[0].description);
+      if (decoded) {
+        mysteries.push({
+          original: txns[0].description,
+          decoded: decoded,
+          amount: mostCommonAmount,
+          count: txns.length
+        });
+      }
+    }
+  });
+  
+  // Sort by annual cost descending
+  subscriptions.sort(function(a, b) { return b.annual - a.annual; });
+  
+  return { subscriptions: subscriptions, mysteries: mysteries };
+}
+
+function normalizeDesc(desc) {
+  return desc.toUpperCase()
+    .replace(/[0-9]{4,}/g, '')
+    .replace(/\s+/g, ' ')
+    .replace(/\b(JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|OCT|NOV|DEC)\b/gi, '')
+    .replace(/[#*]/g, '')
+    .trim()
+    .substring(0, 30);
+}
+
+function cleanName(desc) {
+  return desc.replace(/[0-9]{6,}/g, '').replace(/\s+/g, ' ').replace(/[*#]/g, '').trim().substring(0, 30);
+}
+
+function guessFrequency(txns, amount) {
+  var matching = txns.filter(function(t) { return Math.abs(t.amount - amount) < 0.01; });
+  if (matching.length < 2) return 'monthly';
+  
+  // Try to parse dates and calculate average gap
+  var dates = matching.map(function(t) { return new Date(t.date); }).filter(function(d) { return !isNaN(d); });
+  if (dates.length < 2) return 'monthly';
+  
+  dates.sort(function(a, b) { return a - b; });
+  var gaps = [];
+  for (var i = 1; i < dates.length; i++) {
+    gaps.push((dates[i] - dates[i-1]) / (1000 * 60 * 60 * 24));
+  }
+  var avgGap = gaps.reduce(function(a, b) { return a + b; }, 0) / gaps.length;
+  
+  if (avgGap < 10) return 'weekly';
+  if (avgGap < 20) return 'bi-weekly';
+  if (avgGap < 45) return 'monthly';
+  if (avgGap < 100) return 'quarterly';
+  return 'annual';
+}
+
+function calcAnnual(amount, freq) {
+  var multipliers = { weekly: 52, 'bi-weekly': 26, monthly: 12, quarterly: 4, annual: 1 };
+  return amount * (multipliers[freq] || 12);
+}
+
+function guessCategory(desc) {
+  var upper = desc.toUpperCase();
+  if (/STREAM|TV|MOVIE|FILM|VIDEO/.test(upper)) return 'Streaming';
+  if (/MUSIC|AUDIO|SOUND/.test(upper)) return 'Music';
+  if (/GYM|FIT|WORKOUT|YOGA/.test(upper)) return 'Fitness';
+  if (/CLOUD|STOR|BACKUP/.test(upper)) return 'Cloud Storage';
+  if (/NEWS|PAPER|JOURNAL|MAGAZINE/.test(upper)) return 'News';
+  if (/FOOD|EAT|DELIVER|DASH/.test(upper)) return 'Food Delivery';
+  if (/GAME|PLAY|STEAM|EPIC/.test(upper)) return 'Gaming';
+  if (/VPN|SECURE|ANTIVIR|PASSWORD/.test(upper)) return 'Security';
+  if (/INSUR/.test(upper)) return 'Insurance';
+  if (/MOBILE|WIRELESS|CELL/.test(upper)) return 'Phone';
+  return 'Misc';
+}
+
+function tryDecode(desc) {
+  var upper = desc.toUpperCase();
+  var decodings = {
+    'AMZN MKTP': 'Amazon Marketplace purchase',
+    'AMZN DIGITAL': 'Amazon digital subscription (Prime Video, Kindle, etc.)',
+    'GOOGLE *HELPPAY': 'Google Play Store subscription',
+    'GOOGLE *': 'Google service or app subscription',
+    'APL*': 'Apple App Store or service',
+    'SQ *': 'Square payment (local business)',
+    'TST*': 'Toast payment (restaurant)',
+    'SP ': 'Shopify merchant',
+    'PP*': 'PayPal payment',
+    'CKO*': 'Checkout.com payment',
+    'FS *': 'FourSquare / Square payment',
+    'DD *': 'DoorDash',
+    'DEBIT PURCHASE': 'Debit card transaction'
+  };
+  
+  var keys = Object.keys(decodings);
+  for (var i = 0; i < keys.length; i++) {
+    if (upper.includes(keys[i])) return decodings[keys[i]];
+  }
+  return null;
+}
+
+
+// ============================================================
+// UI RENDERING
+// ============================================================
+var currentData = null;
+
+function renderDashboard(result) {
+  currentData = result;
+  var subs = result.subscriptions;
+  var mysteries = result.mysteries;
+  
+  var totalMonthly = 0;
+  var totalAnnual = 0;
+  subs.forEach(function(s) { 
+    totalMonthly += s.frequency === 'monthly' ? s.amount : s.annual / 12;
+    totalAnnual += s.annual; 
+  });
+  
+  // Stats
+  var statsHtml = '';
+  statsHtml += '<div class="stat-card danger"><div class="label">Monthly Spend</div><div class="value">$' + totalMonthly.toFixed(2) + '</div><div class="sub">across ' + subs.length + ' subscriptions</div></div>';
+  statsHtml += '<div class="stat-card warning"><div class="label">Annual Total</div><div class="value">$' + totalAnnual.toFixed(2) + '</div><div class="sub">projected yearly cost</div></div>';
+  statsHtml += '<div class="stat-card savings"><div class="label">Potential Savings</div><div class="value">$' + (totalAnnual * 0.3).toFixed(0) + '+</div><div class="sub">if you cut 30% of subs</div></div>';
+  statsHtml += '<div class="stat-card info"><div class="label">Mystery Charges</div><div class="value">' + mysteries.length + '</div><div class="sub">decoded for you</div></div>';
+  document.getElementById('statsRow').innerHTML = statsHtml;
+  
+  // Monthly chart
+  renderChart(subs);
+  
+  // Subscription list
+  renderSubList(subs);
+  
+  // Categories
+  renderCategories(subs);
+  
+  // Mysteries
+  renderMysteries(mysteries);
+  
+  // Show dashboard
+  document.getElementById('uploadSection').style.display = 'none';
+  document.getElementById('dashboard').classList.add('show');
+  document.getElementById('resetBtn').style.display = 'block';
+}
+
+function renderChart(subs) {
+  var cats = {};
+  subs.forEach(function(s) {
+    if (!cats[s.category]) cats[s.category] = 0;
+    cats[s.category] += s.frequency === 'monthly' ? s.amount : s.annual / 12;
+  });
+  
+  var sorted = Object.keys(cats).sort(function(a, b) { return cats[b] - cats[a]; });
+  var maxVal = cats[sorted[0]] || 1;
+  
+  var html = '<h3>📊 Monthly Spend by Category</h3><div class="bar-chart">';
+  sorted.forEach(function(cat) {
+    var pct = (cats[cat] / maxVal * 100).toFixed(0);
+    var color = CAT_COLORS[cat] || '#6c5ce7';
+    html += '<div class="bar-row">';
+    html += '<div class="bar-label">' + cat + '</div>';
+    html += '<div class="bar-track"><div class="bar-fill" style="width:' + pct + '%;background:' + color + '">$' + cats[cat].toFixed(0) + '</div></div>';
+    html += '<div class="bar-value">$' + cats[cat].toFixed(2) + '/mo</div>';
+    html += '</div>';
+  });
+  html += '</div>';
+  document.getElementById('monthlyChart').innerHTML = html;
+}
+
+function renderSubList(subs) {
+  var html = '<div class="sub-header"><div>Service</div><div>Monthly</div><div>Annual</div><div>Frequency</div><div>Category</div><div></div></div>';
+  subs.forEach(function(s) {
+    var monthly = s.frequency === 'monthly' ? s.amount : s.annual / 12;
+    html += '<div class="sub-row">';
+    html += '<div class="sub-name"><div class="emoji">' + s.emoji + '</div><div class="details"><div class="title">' + s.name + '</div><div class="desc">' + s.rawName.substring(0, 35) + '</div></div></div>';
+    html += '<div class="sub-amount">$' + monthly.toFixed(2) + '</div>';
+    html += '<div class="sub-annual">$' + s.annual.toFixed(2) + '/yr</div>';
+    html += '<div class="sub-freq">' + s.frequency + '</div>';
+    html += '<div class="sub-category"><span class="cat-tag">' + s.category + '</span></div>';
+    html += '<div class="sub-action">' + (s.cancelUrl ? '<a href="' + s.cancelUrl + '" target="_blank">Cancel</a>' : '<a href="https://www.google.com/search?q=how+to+cancel+' + encodeURIComponent(s.name) + '" target="_blank">Cancel</a>') + '</div>';
+    html += '</div>';
+  });
+  document.getElementById('subList').innerHTML = html;
+}
+
+function renderCategories(subs) {
+  var cats = {};
+  subs.forEach(function(s) {
+    if (!cats[s.category]) cats[s.category] = { total: 0, items: [] };
+    var monthly = s.frequency === 'monthly' ? s.amount : s.annual / 12;
+    cats[s.category].total += monthly;
+    cats[s.category].items.push(s.name);
+  });
+  
+  var totalAll = 0;
+  Object.keys(cats).forEach(function(c) { totalAll += cats[c].total; });
+  
+  var sorted = Object.keys(cats).sort(function(a, b) { return cats[b].total - cats[a].total; });
+  var html = '';
+  sorted.forEach(function(cat) {
+    var pct = totalAll > 0 ? (cats[cat].total / totalAll * 100) : 0;
+    var color = CAT_COLORS[cat] || '#6c5ce7';
+    html += '<div class="cat-card">';
+    html += '<div class="cat-header"><div class="cat-name">' + cat + '</div><div class="cat-total">$' + cats[cat].total.toFixed(2) + '/mo</div></div>';
+    html += '<div class="cat-bar"><div class="fill" style="width:' + pct + '%;background:' + color + '"></div></div>';
+    html += '<div class="cat-items">' + cats[cat].items.join(', ') + '</div>';
+    html += '</div>';
+  });
+  document.getElementById('catGrid').innerHTML = html;
+}
+
+function renderMysteries(mysteries) {
+  if (mysteries.length === 0) {
+    document.getElementById('mysteryList').innerHTML = '<div class="mystery-card"><div><div class="charge-name">No mystery charges found!</div><div class="charge-decoded">All charges were identified 🎉</div></div></div>';
+    return;
+  }
+  var html = '';
+  mysteries.forEach(function(m) {
+    html += '<div class="mystery-card">';
+    html += '<div><div class="charge-name">' + m.original + '</div><div class="charge-decoded">→ ' + m.decoded + '</div></div>';
+    html += '<div class="charge-amount">$' + m.amount.toFixed(2) + ' × ' + m.count + '</div>';
+    html += '</div>';
+  });
+  document.getElementById('mysteryList').innerHTML = html;
+}
+
+// ============================================================
+// TAB SWITCHING
+// ============================================================
+function switchTab(tab) {
+  document.querySelectorAll('.tab').forEach(function(t) { t.classList.remove('active'); });
+  event.target.classList.add('active');
+  
+  document.getElementById('subsTab').style.display = tab === 'subs' ? 'block' : 'none';
+  document.getElementById('categoriesTab').className = tab === 'categories' ? 'category-section show' : 'category-section';
+  document.getElementById('mysteryTab').className = tab === 'mystery' ? 'mystery-section show' : 'mystery-section';
+}
+
+// ============================================================
+// FILE HANDLING
+// ============================================================
+document.getElementById('fileInput').addEventListener('change', function(e) {
+  var files = e.target.files;
+  if (files.length === 0) return;
+  
+  var allTransactions = [];
+  var loaded = 0;
+  
+  Array.from(files).forEach(function(file) {
+    var reader = new FileReader();
+    reader.onload = function(ev) {
+      var text = ev.target.result;
+      var txns = parseCSV(text);
+      if (txns.length === 0) txns = parseRawText(text);
+      allTransactions = allTransactions.concat(txns);
+      loaded++;
+      if (loaded === files.length) {
+        var result = findSubscriptions(allTransactions);
+        renderDashboard(result);
+      }
+    };
+    reader.readAsText(file);
+  });
+});
+
+// Drag and drop
+var zone = document.getElementById('uploadZone');
+zone.addEventListener('dragover', function(e) { e.preventDefault(); zone.classList.add('dragover'); });
+zone.addEventListener('dragleave', function() { zone.classList.remove('dragover'); });
+zone.addEventListener('drop', function(e) {
+  e.preventDefault();
+  zone.classList.remove('dragover');
+  document.getElementById('fileInput').files = e.dataTransfer.files;
+  document.getElementById('fileInput').dispatchEvent(new Event('change'));
+});
+
+function toggleManual() {
+  var area = document.getElementById('manualArea');
+  area.classList.toggle('show');
+}
+
+function parseManualInput() {
+  var text = document.getElementById('manualText').value;
+  if (!text.trim()) return;
+  
+  var txns = parseCSV(text);
+  if (txns.length === 0) txns = parseRawText(text);
+  
+  if (txns.length === 0) {
+    alert('Could not parse any transactions. Try CSV format:\nDate,Description,Amount');
+    return;
+  }
+  
+  var result = findSubscriptions(txns);
+  renderDashboard(result);
+}
+
+// ============================================================
+// EXPORT FUNCTIONS
+// ============================================================
+function exportCSV() {
+  if (!currentData) return;
+  var csv = 'Service,Monthly Cost,Annual Cost,Frequency,Category,Cancel URL\n';
+  currentData.subscriptions.forEach(function(s) {
+    var monthly = s.frequency === 'monthly' ? s.amount : s.annual / 12;
+    csv += '"' + s.name + '",' + monthly.toFixed(2) + ',' + s.annual.toFixed(2) + ',' + s.frequency + ',"' + s.category + '",' + (s.cancelUrl || '') + '\n';
+  });
+  downloadFile(csv, 'subscriptions.csv', 'text/csv');
+}
+
+function exportJSON() {
+  if (!currentData) return;
+  downloadFile(JSON.stringify(currentData, null, 2), 'subscriptions.json', 'application/json');
+}
+
+function downloadFile(content, filename, type) {
+  var blob = new Blob([content], { type: type });
+  var a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = filename;
+  a.click();
+}
+
+function resetApp() {
+  document.getElementById('uploadSection').style.display = 'block';
+  document.getElementById('dashboard').classList.remove('show');
+  document.getElementById('resetBtn').style.display = 'none';
+  document.getElementById('fileInput').value = '';
+  currentData = null;
+}
+
+// ============================================================
+// DEMO DATA
+// ============================================================
+function loadDemo() {
+  var demoCSV = "Date,Description,Amount\n" +
+    "01/03/2026,NETFLIX.COM,-15.99\n" +
+    "01/03/2026,SPOTIFY USA,-11.99\n" +
+    "01/05/2026,AMAZON PRIME MEMBERSHIP,-14.99\n" +
+    "01/05/2026,ADOBE CREATIVE CLOUD,-54.99\n" +
+    "01/07/2026,GOOGLE *YOUTUBE PREMIUM,-13.99\n" +
+    "01/07/2026,CHATGPT PLUS SUBSCRIPTION,-20.00\n" +
+    "01/08/2026,PLANET FITNESS MONTHLY,-24.99\n" +
+    "01/10/2026,MICROSOFT 365 PERSONAL,-9.99\n" +
+    "01/10/2026,DROPBOX PLUS,-11.99\n" +
+    "01/12/2026,NORDVPN SUBSCRIPTION,-12.99\n" +
+    "01/12/2026,HULU LLC,-17.99\n" +
+    "01/14/2026,SQ *COFFEE SHOP,-5.75\n" +
+    "01/15/2026,AMZN DIGITAL*RT5KL9,-2.99\n" +
+    "01/15/2026,DOORDASH DASHPASS,-9.99\n" +
+    "01/18/2026,NOTION PLUS,-10.00\n" +
+    "01/20/2026,GOOGLE *HELPPAY STORAGE,-2.99\n" +
+    "01/22/2026,DISNEY PLUS MONTHLY,-13.99\n" +
+    "01/25/2026,DUOLINGO PLUS,-7.99\n" +
+    "01/28/2026,GITHUB COPILOT,-10.00\n" +
+    "01/30/2026,HEADSPACE YEARLY,-69.99\n" +
+    "02/03/2026,NETFLIX.COM,-15.99\n" +
+    "02/03/2026,SPOTIFY USA,-11.99\n" +
+    "02/05/2026,AMAZON PRIME MEMBERSHIP,-14.99\n" +
+    "02/05/2026,ADOBE CREATIVE CLOUD,-54.99\n" +
+    "02/07/2026,GOOGLE *YOUTUBE PREMIUM,-13.99\n" +
+    "02/07/2026,CHATGPT PLUS SUBSCRIPTION,-20.00\n" +
+    "02/08/2026,PLANET FITNESS MONTHLY,-24.99\n" +
+    "02/10/2026,MICROSOFT 365 PERSONAL,-9.99\n" +
+    "02/10/2026,DROPBOX PLUS,-11.99\n" +
+    "02/12/2026,NORDVPN SUBSCRIPTION,-12.99\n" +
+    "02/12/2026,HULU LLC,-17.99\n" +
+    "02/14/2026,SQ *COFFEE SHOP,-4.50\n" +
+    "02/15/2026,AMZN DIGITAL*RT5KL9,-2.99\n" +
+    "02/15/2026,DOORDASH DASHPASS,-9.99\n" +
+    "02/18/2026,NOTION PLUS,-10.00\n" +
+    "02/20/2026,GOOGLE *HELPPAY STORAGE,-2.99\n" +
+    "02/22/2026,DISNEY PLUS MONTHLY,-13.99\n" +
+    "02/25/2026,DUOLINGO PLUS,-7.99\n" +
+    "02/28/2026,GITHUB COPILOT,-10.00\n" +
+    "03/01/2026,UBER ONE MEMBERSHIP,-9.99\n" +
+    "03/03/2026,NETFLIX.COM,-15.99\n" +
+    "03/03/2026,SPOTIFY USA,-11.99\n" +
+    "03/03/2026,PATREON MEMBERSHIP,-15.00\n";
+  
+  var txns = parseCSV(demoCSV);
+  var result = findSubscriptions(txns);
+  renderDashboard(result);
+}
+</script>
+</body>
+</html>
